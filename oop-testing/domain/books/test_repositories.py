@@ -27,7 +27,7 @@ class TestBooksRepository(ABC, TestCase):
         ...
 
 
-class TestInMemoryRepository(TestBooksRepository, TestCase):
+class TestInMemoryRepository(TestBooksRepository):
     _repo: InMemoryRepository
 
     def get_repository(self) -> BooksRepository:
@@ -42,6 +42,8 @@ class TestInMemoryRepository(TestBooksRepository, TestCase):
             return
         self._repo.books[book.id] = book
 
+
+class TestRepository(TestInMemoryRepository):
     def test_get(self) -> None:
         book_to_get = Book(title='Lord of the Rings', author='J.R.R. Tolkien',
                            publishing_date=datetime(year=1954, month=7, day=29))
