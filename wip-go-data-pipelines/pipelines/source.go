@@ -1,14 +1,20 @@
 package pipelines
 
+import "context"
+
 type Pagination struct {
-	Start int
-	Limit int
+	PageNumber int
+	PageSize   int
 }
 
-func ListNumbers(p Pagination) ([]int, error) {
-	result := make([]int, 0, p.Limit)
+// ListNumbers emulates a typical data source creating a fictitious result considering the Pagination parameter
+func ListNumbers(_ context.Context, p Pagination) ([]int, error) {
+	result := make([]int, 0, p.PageSize)
 
-	for i := p.Start; i < p.Start+p.Limit; i++ {
+	start := (p.PageNumber - 1) * p.PageSize
+	finish := p.PageNumber * p.PageSize
+
+	for i := start; i < finish; i++ {
 		result = append(result, i)
 	}
 	return result, nil
