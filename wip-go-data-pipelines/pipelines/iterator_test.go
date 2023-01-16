@@ -3,31 +3,31 @@ package pipelines
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 )
 
 func TestPipeline(t *testing.T) {
-	type args struct {
-		ctx context.Context
+	want := make([]int, 100)
+	for i := 0; i < 100; i++ {
+		want[i] = i
 	}
+
 	tests := []struct {
-		name  string
-		want  []int
-		want1 chan error
-	}{
-		{
-			name:  "first test",
-			want:  []int{0, 1, 2, 3, 4, 5, 6, 7},
-			want1: nil,
-		},
-	}
+		name    string
+		want    []int
+		wantErr error
+	}{{
+		name: "first test",
+		want: want,
+	}}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			gotIntCh, gotErrCh := Pipeline(ctx)
 			gotInt := make([]int, 0)
+			var gotErr error
 
 			go func() {
 				for n := range gotIntCh {
@@ -35,7 +35,9 @@ func TestPipeline(t *testing.T) {
 				}
 				cancel()
 			}()
+
 			select {
+			case gotErr = <-gotErrCh:
 			case <-ctx.Done():
 			}
 
@@ -48,8 +50,9 @@ func TestPipeline(t *testing.T) {
 				t.Errorf("Pipeline() returned results quantity different than expected. got=%v, want=%v",
 					len(gotInt), len(tt.want))
 			}
-			if !reflect.DeepEqual(gotErrCh, tt.want1) {
-				t.Errorf("Pipeline() gotErrCh = %v, want %v", gotErrCh, tt.want1)
+
+			if gotErr != tt.wantErr {
+				t.Errorf("Pipeline() gotErr = %v, want %v", gotErr, tt.wantErr)
 			}
 		})
 	}

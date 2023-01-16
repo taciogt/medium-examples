@@ -19,3 +19,7 @@ func ListNumbers(_ context.Context, p Pagination) ([]int, error) {
 	}
 	return result, nil
 }
+
+func NumbersCount(_ context.Context) (int, error) {
+	return 100, nil
+}
