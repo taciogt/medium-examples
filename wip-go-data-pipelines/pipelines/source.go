@@ -20,6 +20,7 @@ func ListNumbers(_ context.Context, p Pagination) ([]int, error) {
 	return result, nil
 }
 
+// NumbersCount is a companion method for the data source and returns the total objects quantity that can be listed.
 func NumbersCount(_ context.Context) (int, error) {
 	return 100, nil
 }
