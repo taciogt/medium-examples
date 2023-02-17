@@ -99,12 +99,45 @@ func Pipeline(ctx context.Context) (chan int, chan error) {
 ```
 
 Despite being quite simple at first glance, this block of code has some decisions worth noticing:
-* The function has a single `context.Context` parameter. It doesn't require more than that since all data will be retrieved, and this `ctx` variable will be useful to handle communications between go routines;
+* The function has a single `context.Context` parameter. It doesn't require more than that since all data will be retrieved, and this `ctx` variable will be required to handle communications between go routines;
 * There are two distinct channels being returned, the last one reserved for errors. 
-  * It is possible to create a struct holding successful values and errors, enabling the return of a single value, but the chosen approach looks closer to most go signatures that return an error
+  * It is possible to create a struct holding successful values and errors, enabling the return of a single value. 
+  The chosen approach looks closer to most go signatures that return an error
 * The result values are unbuffered `chan` values. 
-  * One could argue that a buffered channel could improve performance by optimizing for I/O throughput, but it would lead to increased complexity. Buffered channels should be checked for buffer length before closing to avoid discarding relevant messages.  
-  * The choice of unbuffered channels ensure that every message send to a channel is received by someone and increasing in throughput can still be achieved by spawning more channel receiver (using the _fan out pattern_)  
+  * One could argue that a buffered channel could improve performance by optimizing for I/O throughput, but it would lead to increased complexity. 
+  Buffered channels would requiring checking the buffer length before closing to avoid discarding relevant data.  
+  * The choice of unbuffered channels ensure that every message send to a channel is received by someone.
+  Increasing in throughput can still be achieved by spawning more channel receiver (using the _fan out pattern_)
+
+### Channel management
+
+```go
+func Pipeline(ctx context.Context) (chan int, chan error) {
+	resultInt := make(chan int)
+	resultErr := make(chan error)
+
+	go func() {
+	    defer close(resultInt)	
+	    defer close(resultErr)
+
+		g, ctx := errgroup.WithContext(ctx)
+
+        // ...
+		
+        if err := g.Wait(); err != nil {
+            resultErr <- err
+        }
+    }()
+
+	return resultInt, resultErr
+}
+```
+
+This next step for the pipeline starts a go routine responsible for in fact sending data to the channels created.
+The first thing to keep in mind, is reminding to close these channels mentioned and it should be done o function exit using the `defer` statement.
+
+After that, it is created an `errorgroup.Group` using the experimental package [errgroup](https://pkg.go.dev/golang.org/x/sync/errgroup@v0.1.0#pkg-overview).
+This group `g` will be responsible for executing the go routines responsible for each page of data, and the `g.Wait()` statement ensures that an error returned by any of these routines is delivered to the correct channel. 
 
 ## Consuming from a pipeline
 

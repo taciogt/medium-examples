@@ -25,11 +25,12 @@ func Pipeline(ctx context.Context) (chan int, chan error) {
 		pagesCount := totalNumbers / pageSize
 
 		for pageNumber := 1; pageNumber <= pagesCount; pageNumber++ {
+			pagination := Pagination{
+				PageNumber: pageNumber,
+				PageSize:   pageSize,
+			}
 			g.Go(func() error {
-				ns, err := ListNumbers(ctx, Pagination{
-					PageNumber: pageNumber,
-					PageSize:   pageSize,
-				})
+				ns, err := ListNumbers(ctx, pagination)
 				if err != nil {
 					return err
 				}
