@@ -40,6 +40,19 @@ func ListItemsOfTypeInt(_ context.Context, p Pagination) ([]int, error) {
 }
 ```
 
+#### Page quantity
+
+In addition to this method, it is also useful (maybe even necessary) to have a method responsible for knowing the total amount of data that can be retrieved.
+Something like:
+
+```go
+func NumberCount(_ context.Context) (int, error) {
+	...
+}
+``` 
+
+These methods can be bundled in a `struct` and/or `interface` to always pair them together, but it not the intention of this article to dive into these details. 
+
 ### Data Pipe
 
 The data pipe itself is a stream of data that _returns_ an unbounded list of items. 
@@ -111,6 +124,8 @@ Despite being quite simple at first glance, this block of code has some decision
 
 ### Channel management
 
+After the channels creation, it is necessary to ensure they are closed once the functions finishes to avoid locking any resources. 
+
 ```go
 func Pipeline(ctx context.Context) (chan int, chan error) {
 	resultInt := make(chan int)
@@ -138,6 +153,59 @@ The first thing to keep in mind, is reminding to close these channels mentioned 
 
 After that, it is created an `errorgroup.Group` using the experimental package [errgroup](https://pkg.go.dev/golang.org/x/sync/errgroup@v0.1.0#pkg-overview).
 This group `g` will be responsible for executing the go routines responsible for each page of data, and the `g.Wait()` statement ensures that an error returned by any of these routines is delivered to the correct channel. 
+
+### Iteration through pages
+
+With the channels creation and closing solved, now the data source can be used to retrieve the data using the available pagination.  
+
+```go
+func Pipeline(ctx context.Context) (chan int, chan error) {
+    resultInt := make(chan int)
+    resultErr := make(chan error)
+    
+    go func () {
+        defer close(resultInt)
+        defer close(resultErr)
+    
+        g, ctx := errgroup.WithContext(ctx)
+
+        totalNumbers, err := NumbersCount(ctx)
+        if err != nil {
+            resultErr <- err
+            return
+        }
+        
+        pageSize := 10  // arbitrary value
+        pagesCount := totalNumbers / pageSize
+        
+        for pageNumber := 1; pageNumber <= pagesCount; pageNumber++ {
+            pagination := Pagination{
+                PageNumber: pageNumber,
+                PageSize:   pageSize,
+            }
+            g.Go(func() error {
+                //...
+            })
+        }
+		
+        if err := g.Wait(); err != nil {
+			resultErr <- err
+        }
+    }()
+    
+    return resultInt, resultErr
+}
+```
+
+The first part of this new code, from the `totalNumber` variable creation to `pagesCount` calculation hasn't so many things worth noticing, but it is interesting to see how the rest of the function made this bit a little easier.
+If there is any error returned by the `NumberCount(...)` call, this value is send to a channel and the function returns. 
+Due to the deferred closing the `if` block doesn't require more than that.
+And the `pageSize` value is completely arbitrary and can be tweaked for optimization purposes without affecting anything outside the pipeline.
+
+The second part starts a `for` loop that has an interesting detail for those not familiar in dealing with go routines.
+The `pagination` variable is created to avoid using directly the variable `pageNumber` inside the go routine started inside the loop. 
+The latter value changes over the same reference, while the former creates a new reference every iteration. Ignoring this could (which means that eventually will) lead to race conditions and unexpected behavior.
+Another strategy to avoid that is passing the used values as parameters for the go routine, but it wasn't possible `errgroup` package.
 
 ## Consuming from a pipeline
 
