@@ -205,7 +205,71 @@ And the `pageSize` value is completely arbitrary and can be tweaked for optimiza
 The second part starts a `for` loop that has an interesting detail for those not familiar in dealing with go routines.
 The `pagination` variable is created to avoid using directly the variable `pageNumber` inside the go routine started inside the loop. 
 The latter value changes over the same reference, while the former creates a new reference every iteration. Ignoring this could (which means that eventually will) lead to race conditions and unexpected behavior.
-Another strategy to avoid that is passing the used values as parameters for the go routine, but it wasn't possible `errgroup` package.
+Another strategy to avoid that is passing the used values as parameters for the go routine, but it wasn't possible using the `errgroup` package.
+
+### Send data to the channels
+
+With everything set up, the final piece of the puzzle is calling the data source and send the retrieved data to the returned channels
+
+```go
+func Pipeline(ctx context.Context) (chan int, chan error) {
+    resultInt := make(chan int)
+    resultErr := make(chan error)
+    
+    go func () {
+        defer close(resultInt)
+        defer close(resultErr)
+    
+        g, ctx := errgroup.WithContext(ctx)
+
+        totalNumbers, err := NumbersCount(ctx)
+        if err != nil {
+            resultErr <- err
+            return
+        }
+        
+        pageSize := 10  // arbitrary value
+        pagesCount := totalNumbers / pageSize
+        
+        for pageNumber := 1; pageNumber <= pagesCount; pageNumber++ {
+            pagination := Pagination{
+                PageNumber: pageNumber,
+                PageSize:   pageSize,
+            }
+            g.Go(func() error {
+                ns, err := ListNumbers(ctx, pagination)
+                if err != nil {
+					return err
+                }
+                for _, n := range ns {
+                    select {
+					case resultInt <- n:
+					case <-ctx.Done():
+                        return ctx.Err()
+                    }
+				}
+                return nil
+            })
+        }
+		
+        if err := g.Wait(); err != nil {
+			resultErr <- err
+        }
+    }()
+    
+    return resultInt, resultErr
+}
+```
+
+This last go routine started has the core of the Pipeline function, connection all the pieces, but since the explanation was broken down there is little left to describe.
+
+The first detail worth noticing is that by using the `errgrop` package it is not necessary to use the `resultErr` channel inside this go routine.
+Just returning the error in this function is enough because leaves for the `g.Wait()` call this responsibility.
+
+The only thing left to do is going through each value returned by the data source and send to the `resultInt` channel. 
+This is done by a `select/case` block that is also capable of exiting the whole routine when `ctx` is done. 
+Another worthy detail is the `<-ctx.Done()` statement, which enables both external cancellation 
+and timeout capabilities.
 
 ## Consuming from a pipeline
 
