@@ -273,4 +273,41 @@ and timeout capabilities.
 
 ## Consuming from a pipeline
 
+The pipeline is concerned of abstract most complexities of the problem discussed, so consuming data from it should be more straightforward and have fewer caveats. 
+The next example illustrates a common usage scenario:
+
+```go
+func main() {
+    ctx, _ := context.WithTimeout(context.Background(), time.Second)
+    intCh, errCh := pipelines.Pipeline(ctx)
+    
+    for n := range intCh {
+        fmt.Printf("result: %d\n", n)
+    }
+    
+    if err := <-errCh; err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("successfully executed program")
+}
+```
+
+Thankfully to all that already abstracted complexity, there is not much that requires attention on this block of code.
+On the consumer side it looks like the iteration through a simple slice, but without having to deal with pagination details.
+The for loop will immediately exit upon pipeline completion, and the err handling must not be forgotten after that. 
+
+One could also argue about the alternative strategies to improve upon this for, like using a fixed fan-out with a `select/case` block or even dynamically started go routines on the consumer side. But there's enough room for more performance optimization, abstractions and complexities on that matter to leave for another discussion.
+
+## Further steps 
+
+The pipeline described shows a simple structure to avoid bringing unnecessary complexity to the discussion, but can, and should, evolve through refactoring to be truly reusable in more diverse contexts. It has some obvious limitations on the data source used from a hardcoded function and other not so obvious in places that leave no opportunity for external configuration.
+
+Starting from the most explicit points, the data source be made more flexible using an interface passed as parameter.
+Inverting this dependency would allow the same pipeline to work with any struct that adheres to a predefined signature. The addition of generics in the last versions of the language created even more possibilities of reuse.
+
+On the configurations and tweaks side of improvements, there are some values that are hard-coded and could be parameterized and others that could be created. The former has an example in the `pageSize` variable and the latter has one in the quantity of go routines spawned to list each page: there is no limit for it but could exist a configuration parameter to limit it.
+
 ## Considerations
+
+The pipeline provides a reusable pattern to 
