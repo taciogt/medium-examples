@@ -310,4 +310,19 @@ On the configurations and tweaks side of improvements, there are some values tha
 
 ## Considerations
 
-The pipeline provides a reusable pattern to 
+The pipeline provides a reusable pattern for dealing with streams of data and provides solutions for the problems and concerns that rise when dealing with concurrency and parallelism. 
+As a side effect of the discussion, the analysis of the solutions give an overview of some tools and idioms specifics of the Go language and central to these designs.
+
+Not only channels and go routines are essential to this solution, but constructs like the select/case block and the context package also answer some questions raised when thinking about possible use cases. 
+Knowing them expands considerably the toolset of the software engineers writing Go code allowing them to harness the power of one of the core features of the language.
+
+Nevertheless, it is always worthy saying that this is no silver bullet. 
+All these capabilities comes with some complexity that requires some consideration to no create unexpected side effects. 
+Not only are concurrency concerns, but using diving into parallelism can use more CPU to increase throughput at the cost of finding bottlenecks in other places, maybe some shared components that can affect other parts of the system. 
+
+Taking into the account the context where a pipeline will be used, it is possible to make a powerful and generic package. 
+Some adjusts aiming for increased flexibility can go a long way in that direction without changing the core of the design or creating more difficult problems.   
+
+The main driver for this discussion comes from the idea that parallel data consumption enables fine-tuning for optimal I/O throughput. 
+In times intensive on data availability as well as computing power, can be decisive knowing how to make the best use of this resources.
+Go is a language that comes with batteries included in its core syntax and can turn this idea into reality more easily if reliable and standard solutions are made available for its users.
